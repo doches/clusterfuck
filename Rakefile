@@ -5,8 +5,8 @@ begin
   require 'jeweler'
   Jeweler::Tasks.new do |gem|
     gem.name = "clusterfuck"
-    gem.summary = %Q{TODO: one-line summary of your gem}
-    gem.description = %Q{TODO: longer description of your gem}
+    gem.summary = %Q{Run jobs across multiple machines via ssh}
+    gem.description = %Q{Automate the execution of jobs across multiple machines with SSH. Ideal for systems with shared filesystems.}
     gem.email = "doches@gmail.com"
     gem.homepage = "http://github.com/doches/clusterfuck"
     gem.authors = ["Trevor Fountain"]
@@ -53,4 +53,5 @@ Rake::RDocTask.new do |rdoc|
   rdoc.title = "clusterfuck #{version}"
   rdoc.rdoc_files.include('README*')
   rdoc.rdoc_files.include('lib/**/*.rb')
+  rdoc.options += ["-SHN","-f","darkfish"]
 end

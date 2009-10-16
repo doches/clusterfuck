@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+
+require 'clusterfuck'
+if ARGV[0]
+  # Use specified file
+  load ARGV[0]
+else
+  # Search the current directory for a clusterfile
+  found = false
+  Dir.foreach(".") do |file|
+    if file.downcase == "clusterfile"
+      load file
+      found = true
+      break
+    end
+  end
+  if not found
+    STDERR.puts "No clusterfile found!"
+  end
+end
