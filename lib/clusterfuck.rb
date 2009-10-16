@@ -12,6 +12,11 @@ module Clusterfuck
   # Print a message for cancellations and failures, AND each time a job is started.
   VERBOSE_ALL = 2
 
+  # The flag used to prefix dry run (debugging) messages.
+  DEBUG_WARN = "[DRY-RUN]"
+  # The interval to sleep instead of running jobs when performing a dry run (in seconds)
+  DEBUG_INTERVAL = [0.2,1.0]
+
   # A configuration holds the various pieces of information Clusterfuck needs
   # to represent a task. 
   #
@@ -28,6 +33,9 @@ module Clusterfuck
   # [username]    The SSH username to use to connect
   # [password]    The SSH password to use to connect
   # [show_report] Show a report after all jobs are complete that gives statistics for each machine.
+  # [debug]       Do a 'dry run' -- allocate jobs to machines and display the result but DO NOT actually
+  #               connect to any machines or run any jobs. Useful for testing your clusterfile before 
+  #               kicking off a major run.
   class Configuration
     # Holds the user-specified options. Again, you probably don't want to access this directly -- use the
     # getter/setter syntax instead.
@@ -78,6 +86,12 @@ module Clusterfuck
       
       # Wait for jobs to terminate
       machines.each { |machine| machine.thread.join }
+      
+      # Print a report, if requested
+      if config.show_report
+        puts " Machine\t| STARTED\t| COMPLETE\t| FAILED\t|"
+        machines.each { |machine| puts machine.report }
+      end
     end
   end
   
@@ -89,6 +103,12 @@ module Clusterfuck
     attr_accessor :config
     # The thread represented this machine's ssh process
     attr_reader :thread
+    # The number of jobs this machine has completed
+    attr_reader :jobs_completed
+    # The number of jobs this machine has attempted
+    attr_reader :jobs_attempted
+    # Was this machine dropped from the host list (too many failed jobs)?
+    attr_reader :dropped
 
     # Create a new machine with the specified +host+ and +config+
     def initialize(host,config)
@@ -96,6 +116,9 @@ module Clusterfuck
       self.config = config
       
       @thread = nil
+      @jobs_completed = 0
+      @jobs_attempted = 0
+      @dropped = false
     end
     
     # Open an SSH connection to this machine and process jobs until the global jobs queue is empty
@@ -103,23 +126,44 @@ module Clusterfuck
       @thread = Thread.new do
         while config.jobs.size > 0
           job = config.jobs.shift
-          begin
-            Net::SSH.start(self.host,config.username,:password => config.password,:timeout => config.timeout) do |ssh|
-              puts "Starting job #{job.short_name} on #{self.host}" if config.verbose >= VERBOSE_ALL
-              ssh.exec(job.command + " > #{Dir.getwd}/#{config.temp}/#{job.short_name}.#{self.host}")
+          if config.debug
+            puts "#{DEBUG_WARN} #{self.host} starting job '#{job.short_name}'"
+            puts "#{DEBUG_WARN}     #{job.command}"
+            delay = rand*(DEBUG_INTERVAL[1]-DEBUG_INTERVAL[0])+DEBUG_INTERVAL[0]
+            @jobs_attempted += 1
+            sleep(delay)
+            @jobs_completed += 1
+          else
+            begin
+              @jobs_attempted += 1
+              Net::SSH.start(self.host,config.username,:password => config.password,:timeout => config.timeout) do |ssh|
+                puts "Starting job #{job.short_name} on #{self.host}" if config.verbose >= VERBOSE_ALL
+                ssh.exec(job.command + " > #{Dir.getwd}/#{config.temp}/#{job.short_name}.#{self.host}")
+                @jobs_completed += 1
+              end
+            rescue
+              puts "#{job.short_name} FAILED on #{self.host}, dropping it from the hostlist" if config.verbose >= VERBOSE_FAIL
+              if not job.failed < config.max_fail
+                config.jobs.push job
+                job.failed += 1
+              else
+                puts "CANCELLING #{job.short_name}, too many failures (#{job.failed})" if config.verbose >= VERBOSE_CANCEL
+              end
+              @dropped = true
+              break
             end
-          rescue
-            puts "#{job.short_name} FAILED on #{self.host}, dropping it from the hostlist" if config.verbose >= VERBOSE_FAIL
-            if not job.failed < config.max_fail
-              config.jobs.push job
-              job.failed += 1
-            else
-              puts "CANCELLING #{job.short_name}, too many failures (#{job.failed})" if config.verbose >= VERBOSE_CANCEL
-            end
-            break
           end
         end
       end
+    end
+    
+    # Get a one-line summary of this machine's performance
+    def report
+      short_hostname = self.host
+      if short_hostname.size > 8
+        short_hostname = short_hostname[0..7]
+      end
+      "#{short_hostname}\t\t| #{@jobs_attempted}\t\t| #{@jobs_completed}\t\t| #{@dropped ? 'YES' : 'no'}\t\t|"
     end
   end  
   
