@@ -41,6 +41,8 @@ task :test => :check_dependencies
 
 task :default => :test
 
+gem 'rdoc'
+require 'rdoc'
 require 'rake/rdoctask'
 Rake::RDocTask.new do |rdoc|
   if File.exist?('VERSION')
@@ -50,8 +52,9 @@ Rake::RDocTask.new do |rdoc|
   end
 
   rdoc.rdoc_dir = 'rdoc'
-  rdoc.title = "clusterfuck #{version}"
+  rdoc.title = "Clusterfuck #{version}"
   rdoc.rdoc_files.include('README*')
-  rdoc.rdoc_files.include('lib/**/*.rb')
+  rdoc.rdoc_files.include('lib/*.rb')
+  rdoc.main = "README.rdoc"
   rdoc.options += ["-SHN","-f","darkfish"]
 end
