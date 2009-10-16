@@ -1,17 +1,49 @@
-= clusterfuck
+= Clusterfuck
+==== A Subversive Distributed-Systems Tool
 
-Description goes here.
+Clusterfuck is a tool for automating the process of SSH-ing into remote machines and kickstarting a large number
+of jobs. It's probably best explained by an example, so here's what I use it for:
+
+As part of my research I need to compute the distance between each pair of objects in a set of about 70,000 items.
+Computing the distance between each pair takes a few seconds; running the entire job on a single machine generally takes over a day.
+However, as a member of the University I have a ssh login that works on quite a few machines, so I found myself breaking the job up into smaller, quicker chunks and running each chunk on a different machine.
+Clusterfuck was born out of my frustration with that method -- "surely," I said to myself, "this can be automated."
+
+If you have a lot of jobs to run and access to multiple machines on which to run them, Clusterfuck is for you!
+
+== Usage
+To use Clusterfuck you'll first need to create a configuration file (a "clusterfile"). An example clusterfile might look something like this:
+  
+  Clusterfuck::Task.new do |task|
+    task.hosts = %w{clark asimov}
+    task.jobs = (0..3).map { |x| Clusterfuck::Job.new("host{x}","sleep 0.5 && hostname") }
+    task.temp = "fragments"
+    task.username = "SSHUSERNAME"
+    task.password = "SSHPASSWORD"
+    task.debug = true
+  end
+
+This creates a new clusterfuck task and distributes the jobs across two hosts, +clark+ and +asimov+. 
+The jobs to be run in this case are pretty trivial; we basically ssh into each machine, sleep for a little bit, then get the hostname.
+Whatever each job prints to stdout is saved in +task+.+temp+ (under the current working directory); running
+this clusterfile will create 4 files in +./fragments/+: host0.[hostname], host1.[hostname], host2.[hostname], and host3.[hostname] (where [hostname] is the name of the machine on which the job was run). 
++task.username+ and +task.password+ are the SSH credentials used to log into the maching -- currently, Clusterfuck
+can only use one global set of credentials. There's no technical reason for this, other than the fact that I don't
+really need to use machine-specific logins, so it'll probably appear in future releases.
++task.verbose+ turns on verbose output (messages to stdout each time a job is started, skipped, or canceled).
+
+Once you have a clusterfile you can kick off your jobs by running the command +clusterfuck+ in the same directory.
 
 == Note on Patches/Pull Requests
  
 * Fork the project.
-* Make your feature addition or bug fix.
+* Add something cool or fix a nefarious bug. Documentation wins extra love.
 * Add tests for it. This is important so I don't break it in a
   future version unintentionally.
-* Commit, do not mess with rakefile, version, or history.
-  (if you want to have your own version, that is fine but
-   bump version in a commit by itself I can ignore when I pull)
-* Send me a pull request. Bonus points for topic branches.
+* Commit, but do not mess with rakefile, version, or history.
+  (if you want to have your own version that's ok -- but
+  bump the version in a separate commit that I can ignore when I pull)
+* Send me a pull request. 
 
 == Copyright
 
