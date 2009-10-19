@@ -25,17 +25,21 @@ module Clusterfuck
   # for more information.
   #
   # Possible configuration options include:
-  # [timeout]     Number of seconds to wait before an SSH connection 'times out'
-  # [max_fail]    Max number of times a failing job will be re-attempted on a new machine
+  # [timeout]     Number of seconds to wait before an SSH connection 'times out' (DEFAULT: 2)
+  # [max_fail]    Max number of times a failing job will be re-attempted on a new machine (DEFAULT: 3)
   # [hosts]       Array of hostnames (or ip addresses) as Strings to use as nodes
   # [jobs]        Array of Job objects, one per job, which will be allocated to the +hosts+
   # [verbose]     Level of message reporting. One of +VERBOSE_CANCEL+,+VERBOSE_FAIL+, or +VERBOSE_ALL+
+  #               (DEFAULT: +VERBOSE_CANCEL+)
   # [username]    The SSH username to use to connect
   # [password]    The SSH password to use to connect
   # [show_report] Show a report after all jobs are complete that gives statistics for each machine.
   # [debug]       Do a 'dry run' -- allocate jobs to machines and display the result but DO NOT actually
   #               connect to any machines or run any jobs. Useful for testing your clusterfile before 
   #               kicking off a major run.
+  # [temp]        Directory in which to capture stdout from each job. Setting this to +false+
+  #               will cause clusterfuck to ignore job output, leaving it up to you to capture the results
+  #               of each job. (DEFAULT: ./fragments)
   class Configuration
     # Holds the user-specified options. Again, you probably don't want to access this directly -- use the
     # getter/setter syntax instead.
@@ -47,7 +51,8 @@ module Clusterfuck
           "timeout" => 2,
           "max_fail" => 3,
           "verbose" => VERBOSE_CANCEL,
-          "show_report" => true
+          "show_report" => true,
+          "temp" => "./fragments"
         }
     end
     
@@ -78,7 +83,7 @@ module Clusterfuck
       custom.call(config)
       
       # Make output fragment directory
-      `mkdir #{config.temp}` if not File.exists?(config.temp)
+      `mkdir #{config.temp}` if config.temp and not File.exists?(config.temp)
       
       # Run all jobs
       machines = config.hosts.map { |name| Machine.new(name,config) }
@@ -138,7 +143,11 @@ module Clusterfuck
               @jobs_attempted += 1
               Net::SSH.start(self.host,config.username,:password => config.password,:timeout => config.timeout) do |ssh|
                 puts "Starting job #{job.short_name} on #{self.host}" if config.verbose >= VERBOSE_ALL
-                ssh.exec(job.command + " > #{Dir.getwd}/#{config.temp}/#{job.short_name}.#{self.host}")
+                if config.temp
+                  ssh.exec(job.command + " > #{Dir.getwd}/#{config.temp}/#{job.short_name}.#{self.host}")
+                else
+                  ssh.exec(job.command)
+                end
                 @jobs_completed += 1
               end
             rescue
@@ -159,11 +168,11 @@ module Clusterfuck
     
     # Get a one-line summary of this machine's performance
     def report
-      short_hostname = self.host
-      if short_hostname.size > 8
-        short_hostname = short_hostname[0..7]
+      tab = "\t"
+      if self.host.size > 7
+        tab = ""
       end
-      "#{short_hostname}\t\t| #{@jobs_attempted}\t\t| #{@jobs_completed}\t\t| #{@dropped ? 'YES' : 'no'}\t\t|"
+      "#{self.host}#{tab}\t| #{@jobs_attempted}\t\t| #{@jobs_completed}\t\t| #{@dropped ? 'YES' : 'no'}\t\t|"
     end
   end  
   
