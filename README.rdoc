@@ -26,11 +26,11 @@ To use Clusterfuck you'll first need to create a configuration file (a "clusterf
 This creates a new clusterfuck task and distributes the jobs across two hosts, +clark+ and +asimov+. 
 The jobs to be run in this case are pretty trivial; we basically ssh into each machine, sleep for a little bit, then get the hostname.
 Whatever each job prints to stdout is saved in +task+.+temp+ (under the current working directory); running
-this clusterfile will create 4 files in +./fragments/+: host0.[hostname], host1.[hostname], host2.[hostname], and host3.[hostname] (where [hostname] is the name of the machine on which the job was run). 
-+task.username+ and +task.password+ are the SSH credentials used to log into the maching -- currently, Clusterfuck
+this clusterfile will create 4 files in <code>./fragments/</code>: host0.[hostname], host1.[hostname], host2.[hostname], and host3.[hostname] (where [hostname] is the name of the machine on which the job was run). 
++task+.+username+ and +task+.+password+ are the SSH credentials used to log into the maching -- currently, Clusterfuck
 can only use one global set of credentials. There's no technical reason for this, other than the fact that I don't
 really need to use machine-specific logins, so it'll probably appear in future releases.
-+task.verbose+ turns on verbose output (messages to stdout each time a job is started, skipped, or canceled).
++task+.+verbose+ turns on verbose output (messages to stdout each time a job is started, skipped, or canceled).
 
 Once you have a clusterfile you can kick off your jobs by running the command +clusterfuck+ in the same directory.
 
@@ -38,8 +38,7 @@ Once you have a clusterfile you can kick off your jobs by running the command +c
  
 * Fork the project.
 * Add something cool or fix a nefarious bug. Documentation wins extra love.
-* Add tests for it. This is important so I don't break it in a
-  future version unintentionally.
+* Add tests for it. I'd really like this, but since I haven't written any tests myself yet I can't really blame you if you skip it...
 * Commit, but do not mess with rakefile, version, or history.
   (if you want to have your own version that's ok -- but
   bump the version in a separate commit that I can ignore when I pull)
