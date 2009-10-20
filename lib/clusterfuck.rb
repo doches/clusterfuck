@@ -28,7 +28,9 @@ module Clusterfuck
   # [timeout]     Number of seconds to wait before an SSH connection 'times out' (DEFAULT: 2)
   # [max_fail]    Max number of times a failing job will be re-attempted on a new machine (DEFAULT: 3)
   # [hosts]       Array of hostnames (or ip addresses) as Strings to use as nodes
-  # [jobs]        Array of Job objects, one per job, which will be allocated to the +hosts+
+  # [jobs]        Array of Job objects, one per job, which will be allocated to the +hosts+. If you're lazy,
+  #               you can also just use an array of strings (where each string is the command to run) -- a short
+  #               name for each will be produced using the first 8 chars from the command.
   # [verbose]     Level of message reporting. One of +VERBOSE_CANCEL+,+VERBOSE_FAIL+, or +VERBOSE_ALL+
   #               (DEFAULT: +VERBOSE_CANCEL+)
   # [username]    The SSH username to use to connect
@@ -52,7 +54,7 @@ module Clusterfuck
           "max_fail" => 3,
           "verbose" => VERBOSE_CANCEL,
           "show_report" => true,
-          "temp" => "./fragments"
+          "temp" => "./fragments",
         }
     end
     
@@ -70,6 +72,19 @@ module Clusterfuck
     def to_s
       @options.map { |pair| "#{pair[0]} = \"#{pair[1]}\""}.join(", ")
     end
+    
+    # Convert array of string commands to Job objects if necessary
+    def jobify!
+      @options["jobs"].map! do |job|
+        if not job.is_a?(Job) # Ah-ha, make this string into a job
+          short = job.downcase.gsub(/[^a-z]/,"")
+          short = job[0..7] if short.size > 8 
+          Job.new(short,job)
+        else # Don't change anything...
+          job
+        end
+      end
+    end
   end
   
   # The primary means of interacting with Clusterfuck. Create a new 
@@ -81,6 +96,7 @@ module Clusterfuck
       # Run configuration options specified in clusterfile
       config = Configuration.new
       custom.call(config)
+      config.jobify!
       
       # Make output fragment directory
       `mkdir #{config.temp}` if config.temp and not File.exists?(config.temp)
@@ -90,7 +106,13 @@ module Clusterfuck
       machines.each { |machine| machine.run }
       
       # Wait for jobs to terminate
-      machines.each { |machine| machine.thread.join }
+      machines.each do |machine| 
+        begin
+          machine.thread.join
+        rescue Timeout::Error
+          STDERR.puts machine.to_s
+        end
+      end
       
       # Print a report, if requested
       if config.show_report
@@ -150,7 +172,7 @@ module Clusterfuck
                 end
                 @jobs_completed += 1
               end
-            rescue
+            rescue Timeout::Error
               puts "#{job.short_name} FAILED on #{self.host}, dropping it from the hostlist" if config.verbose >= VERBOSE_FAIL
               if not job.failed < config.max_fail
                 config.jobs.push job
