@@ -1,0 +1,23 @@
+subnet_prefix = "129.215.59"
+range = (10..20)
+
+Clusterfuck::Task.new do |task|
+  # List of machines to use. Since we're using this clusterfile to find machines, build a list of legal ips for subnet/range.
+  task.hosts = range.map { |postfix| "#{subnet_prefix}.#{postfix}" }
+  
+  # List of jobs to run. Here, we want to find the hostname of each ip, so we build a list of size N (where N is the number of hosts we're using).
+  task.jobs = task.hosts.map { |host| "hostname" }
+  
+  # Where to store the result fragments
+  task.temp = "hosts"
+  
+  # SSH username/password
+  task.username = "SSH_USERNAME"
+  task.password = "SSH_PASSWORD"
+  
+  # Do a dry run -- just list jobs/machines and exit.
+  #task.debug = true
+
+  # Show performance report
+  task.show_report = false
+end
