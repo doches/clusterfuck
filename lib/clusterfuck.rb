@@ -31,6 +31,8 @@ module Clusterfuck
   # [jobs]        Array of Job objects, one per job, which will be allocated to the +hosts+. If you're lazy,
   #               you can also just use an array of strings (where each string is the command to run) -- a short
   #               name for each will be produced using the first 8 chars from the command.
+  # [jobnames]    Array of strings, one per job, which will be used as the short name for the corresponding
+  #               Job.
   # [verbose]     Level of message reporting. One of +VERBOSE_CANCEL+,+VERBOSE_FAIL+, or +VERBOSE_ALL+
   #               (DEFAULT: +VERBOSE_CANCEL+)
   # [username]    The SSH username to use to connect
@@ -75,15 +77,20 @@ module Clusterfuck
     
     # Convert array of string commands to Job objects if necessary
     def jobify!
-      @options["jobs"].map! do |job|
-        if not job.is_a?(Job) # Ah-ha, make this string into a job
-          short = job.downcase.gsub(/[^a-z]/,"")
-          short = job[0..7] if short.size > 8 
-          Job.new(short,job)
-        else # Don't change anything...
-          job
-        end
-      end
+    	jobs = []
+    	@options["jobs"].each_with_index do |job,index|
+    		if not job.is_a?(Job)
+    			short = nil
+    			if @options.include?("jobnames")
+    				short = @options["jobnames"][index]
+    			else
+  	        short = job.downcase.gsub(/[^a-z]/,"")
+	          short = job.gsub(/\s/,'')[0..7] if short.size > 8 
+    			end
+    			job = Job.new(short,job)
+    		end
+    		jobs.push job
+    	end
     end
   end
   
@@ -108,15 +115,20 @@ module Clusterfuck
       # Wait for jobs to terminate
       machines.each do |machine| 
         begin
+        	STDERR.puts "Waiting on #{machine.host}" if config.verbose >= VERBOSE_ALL
           machine.thread.join
+          STDERR.puts "#{machine.host} finished" if config.verbose >= VERBOSE_ALL
         rescue Timeout::Error
-          STDERR.puts machine.to_s
+          STDERR.puts machine.to_s if config.verbose >= VERBOSE_FAIL
+        rescue
+          STDERR.puts machine.to_s if config.verbose >= VERBOSE_FAIL
+        	raise $!
         end
       end
       
       # Print a report, if requested
       if config.show_report
-        puts " Machine\t| STARTED\t| COMPLETE\t| FAILED\t|"
+        puts " Machine[0..7]\t| STARTED\t| COMPLETE\t| FAILED\t|"
         machines.each { |machine| puts machine.report }
       end
     end
