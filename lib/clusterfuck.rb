@@ -91,8 +91,8 @@ module Clusterfuck
     		end
     		jobs.push job
     	end
+	    @options["jobs"] = jobs
     end
-    options["jobs"] = jobs
   end
   
   # The primary means of interacting with Clusterfuck. Create a new 
